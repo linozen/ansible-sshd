@@ -1,0 +1,94 @@
+---
+- name: configure sshd
+  become: "yes"
+  template:
+    src: sshd_config.j2
+    dest: /etc/ssh/sshd_config
+    backup: "yes"
+    mode: 0600
+    owner: root
+    group: root
+  notify:
+    - restart sshd
+  tags:
+    - sshd
+
+- name: register /etc/default/motd-news
+  stat:
+    path: /etc/default/motd-news
+  register: motd_news
+  tags:
+    - motd
+
+- name: disable motd-news
+  become: "yes"
+  lineinfile:
+    regexp: "^ENABLED="
+    line: "ENABLED=0"
+    dest: /etc/default/motd-news
+    mode: 0644
+    state: present
+    create: "no"
+    backrefs: "yes"
+  notify:
+    - mask motdnews timer
+    - mask motdnews service
+  when: ansible_os_family == "Debian" and motd_news.stat.exists
+  tags:
+    - motd
+
+- name: find update-motd.d files
+  become: "yes"
+  find:
+    paths: /etc/update-motd.d
+    file_type: file
+  register: update_motd_permissions
+  tags:
+    - motd
+
+- name: motd updates permissions
+  become: "yes"
+  file:
+    dest: "{{ item.path }}"
+    mode: 0444
+  with_items:
+    - "{{ update_motd_permissions.files }}"
+  when: ansible_os_family == "Debian"
+  tags:
+    - motd
+
+- name: /etc/update-motd.d permission
+  become: "yes"
+  file:
+    dest: /etc/update-motd.d
+    mode: 0755
+  when: ansible_os_family == "Debian"
+  tags:
+    - motd
+
+- name: add motd
+  become: "yes"
+  template:
+    src: motd.j2
+    dest: /etc/motd
+    backup: "yes"
+    mode: 0644
+    owner: root
+    group: root
+  tags:
+    - motd
+
+- name: add issue and issue.net
+  become: "yes"
+  template:
+    src: issue.j2
+    dest: "{{ item }}"
+    backup: "yes"
+    mode: 0644
+    owner: root
+    group: root
+  with_items:
+    - /etc/issue
+    - /etc/issue.net
+  tags:
+    - sshd
