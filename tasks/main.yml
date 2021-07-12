@@ -20,6 +20,15 @@
   tags:
     - motd
 
+- name: remove banner files
+  become: "yes"
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /etc/issue
+    - /etc/issue.net
+
 - name: disable motd-news
   become: "yes"
   lineinfile:
